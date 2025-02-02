@@ -65,28 +65,74 @@ class Pendulum {
 
 int main() {
 	sf::ContextSettings settings;
-	settings.antiAliasingLevel = 8;
+	settings.antiAliasingLevel = 4;
 	sf::RenderWindow window(sf::VideoMode({640,480}), "Pendulum", sf::Style::Default, sf::State::Windowed, settings);
+	window.setFramerateLimit(60);
+	
+	const float g = 1.f;
+	float instant_ang_freq = 1.f;
+	float epsilon = 0.1;
 
-	float default_length = 150.f;
+	float default_length = g/pow(instant_ang_freq,2);
 	float loc[2] = {320.f,240.f};
 	
-	Pendulum pendulum(loc, window, default_length, 0.f);
+	Pendulum pendulum(loc, window, default_length * 80.f, 0.f);
 
-	float d_angle = M_PI/18000;
+	// Every frame is a 'second'; dt = 1.
+	float l0 = default_length;
+	float phi = 0.f; // instantaneous phase
+	float theta0 = 0.5 * M_PI;
+	float omega0 = 0.f;
+	float alpha0 = (g/l0)*(std::cos(theta0));
+		// for now
+	
+	float l1;
+	float theta1;
+	float omega1;
+	float alpha1;
 
 	// Start Loop
 	while (window.isOpen()) {
 		while (const std::optional event = window.pollEvent()) {
-        if (event->is<sf::Event::Closed>()) {
-            window.close();
-        }
-        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-            if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
-                window.close();
-        }
-    }
-		pendulum.update(pendulum.getAngle() + d_angle, default_length);
+      if (event->is<sf::Event::Closed>()) {
+        window.close();
+      }
+      else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+        if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
+          window.close();
+				}
+				else if (keyPressed->scancode == sf::Keyboard::Scancode::Space){
+					omega0+=M_PI/90;
+				}
+				else if (keyPressed->scancode == sf::Keyboard::Scancode::LShift){
+					if(std::fmod(instant_ang_freq,1) <= 0.25){
+						epsilon = 0.1;
+						instant_ang_freq = 0.5;
+					}else if(std::fmod(instant_ang_freq,1) >= 0.25){
+						instant_ang_freq = 1.f;
+						epsilon = 0.1;
+					}	
+      	}
+				else if (keyPressed->scancode == sf::Keyboard::Scancode::RShift){
+					epsilon = 0;
+				}
+    	}
+		}
+
+		l1 = g/(pow(instant_ang_freq+epsilon*std::cos(phi),2));
+		theta1 = theta0 + omega0 + (0.5)*alpha0;
+		alpha1 = (g/l1)*(std::cos(theta1));
+		omega1 = omega0 + (0.5)*(alpha0+alpha1);
+		
+		pendulum.update(theta1, l1 * 80.f);
+
+		l0=l1;
+		theta0 = theta1;
+		omega0 = omega1;
+		alpha0 = alpha1;
+		
+		phi = std::fmod(phi + instant_ang_freq+epsilon*std::cos(phi), 2*M_PI);
+		if (phi < 0) phi += 2*M_PI;
 
 		window.clear();
 		pendulum.draw();
