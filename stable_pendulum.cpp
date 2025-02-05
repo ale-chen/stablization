@@ -67,26 +67,27 @@ int main() {
 	sf::ContextSettings settings;
 	settings.antiAliasingLevel = 4;
 	sf::RenderWindow window(sf::VideoMode({640,480}), "Pendulum", sf::Style::Default, sf::State::Windowed, settings);
-	window.setFramerateLimit(60);
+	window.setFramerateLimit(10);
 	
-	const float g = 1.f;
-	float instant_ang_freq = 1.f;
-	float epsilon = 0.1;
+	const float g = 1;
+	float instant_ang_freq = 1;
+	float epsilon = 0.05;
 
 	float default_length = g/pow(instant_ang_freq,2);
 	float loc[2] = {320.f,240.f};
 	
-	Pendulum pendulum(loc, window, default_length * 80.f, 0.f);
+	Pendulum pendulum(loc, window, default_length*50.f, 0.f);
 
 	// Every frame is a 'second'; dt = 1.
-	float l0 = default_length;
 	float phi = 0.f; // instantaneous phase
-	float theta0 = 0.5 * M_PI;
+	float l0 = default_length;
+	float ldot0 = (2 * g * epsilon * std::sin(phi)) / pow(epsilon * std::cos(phi) + instant_ang_freq, 2);
+	float theta0 = -0.5 * M_PI;
 	float omega0 = 0.f;
-	float alpha0 = (g/l0)*(std::cos(theta0));
-		// for now
+	float alpha0 = -2*ldot0*omega0/l0+(g/l0)*(std::cos(theta0)); // Perhaps needs to take into account the change (derivatives) of l?
 	
 	float l1;
+	float ldot1;
 	float theta1;
 	float omega1;
 	float alpha1;
@@ -102,15 +103,15 @@ int main() {
           window.close();
 				}
 				else if (keyPressed->scancode == sf::Keyboard::Scancode::Space){
-					omega0+=M_PI/90;
+					omega0+=M_PI/180;
 				}
 				else if (keyPressed->scancode == sf::Keyboard::Scancode::LShift){
 					if(std::fmod(instant_ang_freq,1) <= 0.25){
-						epsilon = 0.1;
+						epsilon = 0.05;
 						instant_ang_freq = 0.5;
 					}else if(std::fmod(instant_ang_freq,1) >= 0.25){
 						instant_ang_freq = 1.f;
-						epsilon = 0.1;
+						epsilon = 0.05;
 					}	
       	}
 				else if (keyPressed->scancode == sf::Keyboard::Scancode::RShift){
@@ -119,21 +120,24 @@ int main() {
     	}
 		}
 
-		l1 = g/(pow(instant_ang_freq+epsilon*std::cos(phi),2));
+		phi = std::fmod(phi + instant_ang_freq + epsilon*std::cos(phi), 2*M_PI);
+		if (phi < 0) phi += 2*M_PI;
+
+		l1 = g/(pow(instant_ang_freq + epsilon * std::cos(phi), 2));
+		ldot1 = (2 * g * epsilon * std::sin(phi)) / pow(instant_ang_freq + epsilon * std::cos(phi), 2);
 		theta1 = theta0 + omega0 + (0.5)*alpha0;
-		alpha1 = (g/l1)*(std::cos(theta1));
+		alpha1 = -2*ldot1*omega1/l1 + (g/l1)*(std::cos(theta1));
 		omega1 = omega0 + (0.5)*(alpha0+alpha1);
 		
-		pendulum.update(theta1, l1 * 80.f);
+		pendulum.update(theta1, l1*50.f);
+
 
 		l0=l1;
+		ldot0 = ldot1;
 		theta0 = theta1;
 		omega0 = omega1;
 		alpha0 = alpha1;
 		
-		phi = std::fmod(phi + instant_ang_freq+epsilon*std::cos(phi), 2*M_PI);
-		if (phi < 0) phi += 2*M_PI;
-
 		window.clear();
 		pendulum.draw();
 		window.display();
